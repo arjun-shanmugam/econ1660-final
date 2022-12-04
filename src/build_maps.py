@@ -8,6 +8,7 @@ import pandas as pd
 import geopandas as gpd
 import contextily as cx
 mta_df = pd.read_csv("/Users/arjunshanmugam/Documents/GitHub/econ1660-final/data/raw/body.csv")
+print(mta_df['structure'].value_counts())
 top_5_stations = mta_df.groupby('stop_name')['entries'].sum().sort_values(ascending=False).iloc[0:5].index
 mta_df = mta_df.loc[mta_df['stop_name'].isin(top_5_stations), :]
 mta_df.loc[:, 'date'] = pd.to_datetime(mta_df['date'])
