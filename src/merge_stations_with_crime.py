@@ -9,6 +9,7 @@ import geopandas as gpd
 
 INPUT_DATA_CRIME = "/Users/arjunshanmugam/Documents/GitHub/econ1660-final/data/raw/processed_crime_data_2019.csv"
 INPUT_DATA_SUBWAY = "/Users/arjunshanmugam/Documents/GitHub/econ1660-final/data/raw/body.csv"
+OUTPUT_DATA = "/Users/arjunshanmugam/Documents/GitHub/econ1660-final/data/clean/subway_crime_panel.csv"
 
 crime_gdf = pd.read_csv(INPUT_DATA_CRIME)[['Latitude', 'Longitude', 'INCIDENT_DATE', 'TYP_DESC']]
 crime_types_to_include = """OTHER CRIMES (IN PROGRESS): VIOL ORDER PROTECT/OUTSIDE
@@ -155,27 +156,28 @@ OTHER CRIMES (IN PROGRESS): CRIM MISCHIEF/OUTSIDE
 INVESTIGATE/POSSIBLE CRIME: SERIOUS/OTHER
 """.split("\n")
 crime_gdf = crime_gdf.loc[crime_gdf['TYP_DESC'].isin(crime_types_to_include), :].reset_index(drop=True)
-crime_gdf.loc[:, 'INCIDENT_DATE'] = pd.to_datetime(crime_gdf['INCIDENT_DATE'])
 crime_gdf = (gpd.GeoDataFrame(crime_gdf,
                               geometry=gpd.points_from_xy(crime_gdf['Longitude'],
                                                           crime_gdf['Latitude']))
-             .set_crs("EPSG:4326"))
+             .set_crs("EPSG:3857"))
 crime_gdf = crime_gdf.rename(columns={'INCIDENT_DATE': 'Date'})
 
-subway_gdf = pd.read_csv(INPUT_DATA_SUBWAY)[['gtfs_longitude', 'gtfs_latitude', 'date']]
-subway_gdf.loc[:, 'date'] = pd.to_datetime(subway_gdf['date'])
+subway_gdf = pd.read_csv(INPUT_DATA_SUBWAY)[['gtfs_longitude', 'gtfs_latitude', 'date', 'entries', 'exits', 'stop_name']]
 subway_gdf = (gpd.GeoDataFrame(subway_gdf,
                                geometry=gpd.points_from_xy(subway_gdf['gtfs_longitude'],
                                                            subway_gdf['gtfs_latitude']))
-              .set_crs("EPSG:4326"))
+              .set_crs("EPSG:3857"))
 subway_gdf = subway_gdf.rename(columns={'date': 'Date'})
 
 # Join crimes with the nearest subway station.
-print(subway_gdf['Date'])
-print(crime_gdf['Date'])
-subway_gdf = subway_gdf.loc[subway_gdf['Date'].isin(crime_gdf['Date']), :]
+subway_gdf = subway_gdf.loc[subway_gdf['Date'].isin(crime_gdf['Date']), :]  # Limit to dates that appear in both datasets.
 crime_gdf = crime_gdf.loc[crime_gdf['Date'].isin(subway_gdf['Date']), :]
 shards = {k: d for k, d in subway_gdf.groupby('Date')}
 gdf = crime_gdf.groupby('Date').apply(lambda d: gpd.sjoin_nearest(d, shards[d['Date'].values[0]]))
 
-gdf.to_csv("~/Desktop/merge_test.csv")
+gdf = gdf.groupby(by=['stop_name', 'Date'])[['entries', 'exits', 'TYP_DESC']].agg({'entries': 'first',
+                                                                                   'exits': 'first',
+                                                                                   'TYP_DESC': 'count'})
+gdf = gdf.rename(columns={'TYP_DESC': 'incidents'})
+
+gdf.to_csv(OUTPUT_DATA)
