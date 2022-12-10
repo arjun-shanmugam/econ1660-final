@@ -175,9 +175,11 @@ crime_gdf = crime_gdf.loc[crime_gdf['Date'].isin(subway_gdf['Date']), :]
 shards = {k: d for k, d in subway_gdf.groupby('Date')}
 gdf = crime_gdf.groupby('Date').apply(lambda d: gpd.sjoin_nearest(d, shards[d['Date'].values[0]]))
 
-gdf = gdf.groupby(by=['stop_name', 'Date'])[['entries', 'exits', 'TYP_DESC']].agg({'entries': 'first',
-                                                                                   'exits': 'first',
-                                                                                   'TYP_DESC': 'count'})
+gdf = gdf.groupby(by=['stop_name', 'Date'])[['entries', 'exits', 'TYP_DESC', 'gtfs_longitude', 'gtfs_latitude']].agg({'entries': 'first',
+                                                                                                                      'exits': 'first',
+                                                                                                                      'TYP_DESC': 'count',
+                                                                                                                      'gtfs_longitude': 'first',
+                                                                                                                      'gtfs_latitude': 'first'})
 gdf = gdf.rename(columns={'TYP_DESC': 'incidents'})
 
 gdf.to_csv(OUTPUT_DATA)
